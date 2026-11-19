@@ -18,7 +18,7 @@ const app = express();
 // Allowed frontend origins
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://foodie-3oue3efbl-akshay8789s-projects.vercel.app",
+  "https://foodie-beta-two.vercel.app",
   ...(process.env.CLIENT_URL || "")
     .split(",")
     .map((url) => url.trim().replace(/\/$/, ""))
@@ -36,8 +36,7 @@ app.use(
       }
 
       console.log("Blocked CORS origin:", origin);
-
-      return callback(null, false);
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

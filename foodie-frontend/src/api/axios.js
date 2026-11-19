@@ -1,7 +1,8 @@
+
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://foodie-backend-hamm.onrender.com",
+  baseURL: "https://foodie-backend-hamm.onrender.com/api",
   headers: {
     "Content-Type": "application/json",
   },
