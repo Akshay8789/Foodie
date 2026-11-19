@@ -19,18 +19,25 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://foodie-3oue3efbl-akshay8789s-projects.vercel.app",
+  ...(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean),
 ];
 
 // CORS Configuration
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an origin (e.g. server-to-server)
+      console.log("Incoming frontend origin:", origin);
+
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      console.log("Blocked CORS origin:", origin);
+
+      return callback(null, false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
