@@ -1,7 +1,8 @@
 
 import { useEffect, useState } from "react";
 import FoodCard from "../components/FoodCard";
-import api from "../services/api";
+// import api from "../services/api";
+import api from "../api/axios";
 import "./Home.css";
 
 const Home = () => {
