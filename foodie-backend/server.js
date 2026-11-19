@@ -15,11 +15,26 @@ import { razorpayWebhook } from "./controllers/paymentController.js";
 
 const app = express();
 
-// CORS
+// Allowed frontend origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://foodie-3oue3efbl-akshay8789s-projects.vercel.app",
+];
+
+// CORS Configuration
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests without an origin (e.g. server-to-server)
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -33,7 +48,7 @@ app.post(
 // JSON middleware
 app.use(express.json());
 
-// Routes
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/foods", foodRoutes);
 app.use("/api/orders", orderRoutes);
