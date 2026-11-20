@@ -140,85 +140,96 @@ const AdminDashboard = () => {
   };
 
   // ADD OR UPDATE FOOD
-  const handleFoodSubmit = async (e) => {
-    e.preventDefault();
+  
+const handleFoodSubmit = async (e) => {
+  e.preventDefault();
 
-    if (saving) return;
+  if (saving) return;
 
-    try {
-      setSaving(true);
-      setError("");
-      setMessage("");
+  try {
+    setSaving(true);
+    setError("");
+    setMessage("");
 
-      if (!FOOD_CATEGORIES.includes(foodForm.category)) {
-        setError("Please select a valid food category.");
-        return;
-      }
-
-      if (!editingFoodId && !foodForm.image) {
-        setError("Please select a food image.");
-        return;
-      }
-
-      const formData = new FormData();
-
-      formData.append("name", foodForm.name.trim());
-      formData.append("description", foodForm.description.trim());
-      formData.append("price", String(foodForm.price));
-      formData.append("category", foodForm.category);
-      formData.append(
-        "isAvailable",
-        String(foodForm.isAvailable)
-      );
-
-      if (foodForm.image instanceof File) {
-        formData.append("image", foodForm.image);
-      }
-
-      // DEBUG INFORMATION
-      console.log("Selected image:", foodForm.image);
-      console.log("FormData image:", formData.get("image"));
-
-      let response;
-
-      if (editingFoodId) {
-        response = await api.put(
-          `/foods/${editingFoodId}`,
-          formData
-        );
-
-        setMessage("Food updated successfully!");
-      } else {
-        response = await api.post("/foods", formData);
-
-        setMessage("Food added successfully!");
-      }
-
-      console.log("Food API response:", response.data);
-
-      resetFoodForm();
-
-      await fetchData();
-
-      setMessage(
-        editingFoodId
-          ? "Food updated successfully!"
-          : "Food added successfully!"
-      );
-
-    } catch (err) {
-      console.error("Food submission error:", err);
-      console.error("Server response:", err.response?.data);
-
-      setError(
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to save food"
-      );
-    } finally {
-      setSaving(false);
+    if (!FOOD_CATEGORIES.includes(foodForm.category)) {
+      setError("Please select a valid food category.");
+      return;
     }
-  };
+
+    if (!editingFoodId && !(foodForm.image instanceof File)) {
+      setError("Please select a food image.");
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("name", foodForm.name.trim());
+    formData.append("description", foodForm.description.trim());
+    formData.append("price", String(foodForm.price));
+    formData.append("category", foodForm.category);
+    formData.append("isAvailable", String(foodForm.isAvailable));
+
+    if (foodForm.image instanceof File) {
+      formData.append("image", foodForm.image);
+    }
+
+    // Debug logs
+    console.log("Selected image:", foodForm.image);
+
+    for (const [key, value] of formData.entries()) {
+      console.log(
+        "FormData:",
+        key,
+        value instanceof File
+          ? {
+              name: value.name,
+              type: value.type,
+              size: value.size,
+            }
+          : value
+      );
+    }
+
+    const wasEditing = Boolean(editingFoodId);
+
+    let response;
+
+    if (wasEditing) {
+      response = await api.put(
+        `/foods/${editingFoodId}`,
+        formData
+      );
+    } else {
+      response = await api.post("/foods", formData);
+    }
+
+    console.log("Food API response:", response.data);
+
+    resetFoodForm();
+
+    await fetchData();
+
+    setMessage(
+      wasEditing
+        ? "Food updated successfully!"
+        : "Food added successfully!"
+    );
+  } catch (err) {
+    console.error("Food submission error:", err);
+    console.error("Server status:", err.response?.status);
+    console.error("Server message:", err.response?.data?.message);
+    console.error("Full server response:", err.response?.data);
+
+    setError(
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to save food"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   // EDIT FOOD
   const handleEditFood = (food) => {
