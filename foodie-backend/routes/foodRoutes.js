@@ -24,36 +24,7 @@ router.get("/categories", getCategories);
 router.get("/", getFoods);
 router.get("/:id", getFoodById);
 
-// Admin routes
-
-router.post(
-  "/",
-  protect,
-  admin,
-  (req, res, next) => {
-    console.log("Food POST route reached");
-    console.log("Content-Type:", req.headers["content-type"]);
-    next();
-  },
-  upload.single("image"),
-  (req, res, next) => {
-    console.log("Multer received file:", req.file);
-    console.log("Multer received body:", req.body);
-    next();
-  },
-  createFood
-);
-
-
-// router.put(
-//   "/:id",
-//   protect,
-//   admin,
-//   upload.single("image"),
-//   updateFood
-// );
-
-
+// Admin: Create food
 router.post(
   "/",
   protect,
@@ -62,6 +33,21 @@ router.post(
   createFood
 );
 
-router.delete("/:id", protect, admin, deleteFood);
+// Admin: Update food
+router.put(
+  "/:id",
+  protect,
+  admin,
+  upload.single("image"),
+  updateFood
+);
+
+// Admin: Delete food
+router.delete(
+  "/:id",
+  protect,
+  admin,
+  deleteFood
+);
 
 export default router;
