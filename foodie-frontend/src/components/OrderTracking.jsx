@@ -1,5 +1,6 @@
+
 import { useEffect, useState } from "react";
-import api from "../services/api";
+import api from "../api/axios";
 
 const trackingSteps = [
   {
@@ -65,10 +66,8 @@ const OrderTracking = ({ orderId }) => {
       }
     };
 
-    // Initial fetch
     fetchTracking();
 
-    // Refresh tracking every 15 seconds
     const interval = setInterval(fetchTracking, 15000);
 
     return () => {
@@ -77,7 +76,6 @@ const OrderTracking = ({ orderId }) => {
     };
   }, [orderId]);
 
-  // Loading state
   if (loading) {
     return (
       <div className="order-tracking">
@@ -86,7 +84,6 @@ const OrderTracking = ({ orderId }) => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="order-tracking tracking-error">
@@ -96,44 +93,32 @@ const OrderTracking = ({ orderId }) => {
     );
   }
 
-  if (!order) {
-    return null;
-  }
+  if (!order) return null;
 
   const currentIndex = trackingSteps.findIndex(
     (step) => step.value === order.orderStatus
   );
 
   const isCancelled = order.orderStatus === "cancelled";
-
   const history = order.statusHistory || [];
 
-  // Find the latest history entry for a status
-  const getHistoryEntry = (status) => {
-    return history
-      .filter((item) => item.status === status)
-      .slice(-1)[0];
-  };
+  const getHistoryEntry = (status) =>
+    history.filter((item) => item.status === status).slice(-1)[0];
 
   return (
     <section className="order-tracking">
       <div className="tracking-header">
         <h2>Track Your Order</h2>
-
         <p className="tracking-order-id">
           Order ID: {order._id}
         </p>
       </div>
 
-      {/* Current Order Status */}
       <div className="tracking-current">
-        <span>Current Status:</span>
-
+        <span>Current Status: </span>
         <strong
           className={
-            isCancelled
-              ? "status-cancelled"
-              : "status-active"
+            isCancelled ? "status-cancelled" : "status-active"
           }
         >
           {isCancelled
@@ -143,20 +128,14 @@ const OrderTracking = ({ orderId }) => {
         </strong>
       </div>
 
-      {/* Cancelled Order */}
       {isCancelled ? (
         <div className="cancelled-message">
           <h3>Order Cancelled</h3>
-          <p>
-            Unfortunately, this order has been cancelled.
-          </p>
+          <p>Unfortunately, this order has been cancelled.</p>
 
           {getHistoryEntry("cancelled") && (
             <>
-              <p>
-                {getHistoryEntry("cancelled").note}
-              </p>
-
+              <p>{getHistoryEntry("cancelled").note}</p>
               <small>
                 {new Date(
                   getHistoryEntry("cancelled").updatedAt
@@ -166,85 +145,72 @@ const OrderTracking = ({ orderId }) => {
           )}
         </div>
       ) : (
-        <>
-          {/* Tracking Timeline */}
-          <div className="tracking-timeline">
-            {trackingSteps.map((step, index) => {
-              const completed =
-                currentIndex >= 0 && index <= currentIndex;
+        <div className="tracking-timeline">
+          {trackingSteps.map((step, index) => {
+            const completed =
+              currentIndex >= 0 && index <= currentIndex;
 
-              const historyEntry = getHistoryEntry(
-                step.value
-              );
+            const historyEntry = getHistoryEntry(step.value);
 
-              return (
-                <div
-                  className={`tracking-step ${
-                    completed ? "completed" : ""
-                  }`}
-                  key={step.value}
-                >
-                  <div className="tracking-marker">
-                    {completed ? "✓" : index + 1}
-                  </div>
-
-                  <div className="tracking-content">
-                    <h3>{step.label}</h3>
-
-                    <p>{step.description}</p>
-
-                    {historyEntry && (
-                      <>
-                        {historyEntry.note && (
-                          <p className="tracking-note">
-                            {historyEntry.note}
-                          </p>
-                        )}
-
-                        <small>
-                          {new Date(
-                            historyEntry.updatedAt
-                          ).toLocaleString()}
-                        </small>
-                      </>
-                    )}
-                  </div>
+            return (
+              <div
+                className={`tracking-step ${
+                  completed ? "completed" : ""
+                }`}
+                key={step.value}
+              >
+                <div className="tracking-marker">
+                  {completed ? "✓" : index + 1}
                 </div>
-              );
-            })}
-          </div>
-        </>
+
+                <div className="tracking-content">
+                  <h3>{step.label}</h3>
+                  <p>{step.description}</p>
+
+                  {historyEntry && (
+                    <>
+                      {historyEntry.note && (
+                        <p className="tracking-note">
+                          {historyEntry.note}
+                        </p>
+                      )}
+
+                      <small>
+                        {new Date(
+                          historyEntry.updatedAt
+                        ).toLocaleString()}
+                      </small>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* Complete Status History */}
       <div className="tracking-history">
         <h3>Status History</h3>
 
         {history.length === 0 ? (
           <p>No tracking history available.</p>
         ) : (
-          [...history]
-            .reverse()
-            .map((item, index) => (
-              <div
-                className="history-item"
-                key={`${item.status}-${item.updatedAt}-${index}`}
-              >
-                <strong>
-                  {item.status
-                    .replaceAll("_", " ")
-                    .toUpperCase()}
-                </strong>
+          [...history].reverse().map((item, index) => (
+            <div
+              className="history-item"
+              key={`${item.status}-${item.updatedAt}-${index}`}
+            >
+              <strong>
+                {item.status.replaceAll("_", " ").toUpperCase()}
+              </strong>
 
-                {item.note && <p>{item.note}</p>}
+              {item.note && <p>{item.note}</p>}
 
-                <small>
-                  {new Date(
-                    item.updatedAt
-                  ).toLocaleString()}
-                </small>
-              </div>
-            ))
+              <small>
+                {new Date(item.updatedAt).toLocaleString()}
+              </small>
+            </div>
+          ))
         )}
       </div>
 

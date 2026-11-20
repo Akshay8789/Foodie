@@ -69,7 +69,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Important: FormData ke liye browser ko multipart boundary set karne do.
+    // Allow browser to set multipart boundary for FormData
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"];
       delete config.headers["content-type"];
