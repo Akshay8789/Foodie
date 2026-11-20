@@ -1,11 +1,9 @@
 
 import { useEffect, useState } from "react";
-// import api from "../services/api";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import "./AdminDashboard.css";
 
-// Available food categories
 const FOOD_CATEGORIES = [
   "Burger",
   "Pizza",
@@ -37,11 +35,14 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const [editingFoodId, setEditingFoodId] = useState(null);
   const [foodForm, setFoodForm] = useState(initialFoodForm);
+  const [imagePreview, setImagePreview] = useState("");
 
   // FETCH FOODS AND ORDERS
   const fetchData = async () => {
@@ -62,9 +63,11 @@ const AdminDashboard = () => {
 
       setOrders(orderResponse.data.orders || []);
     } catch (err) {
+      console.error("Dashboard fetch error:", err);
+
       setError(
         err.response?.data?.message ||
-          "Failed to load admin dashboard data"
+        "Failed to load admin dashboard data"
       );
     } finally {
       setLoading(false);
@@ -95,79 +98,125 @@ const AdminDashboard = () => {
   const handleFoodChange = (e) => {
     const { name, value, type, checked, files } = e.target;
 
+    if (type === "file") {
+      const selectedFile = files?.[0];
+
+      if (!selectedFile) return;
+
+      if (!selectedFile.type.startsWith("image/")) {
+        setError("Please select a valid image file.");
+        e.target.value = "";
+        return;
+      }
+
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        setError("Image size must be less than 10 MB.");
+        e.target.value = "";
+        return;
+      }
+
+      setFoodForm((previous) => ({
+        ...previous,
+        image: selectedFile,
+      }));
+
+      setImagePreview(URL.createObjectURL(selectedFile));
+
+      setError("");
+      return;
+    }
+
     setFoodForm((previous) => ({
       ...previous,
-      [name]:
-        type === "checkbox"
-          ? checked
-          : type === "file"
-          ? files[0] || null
-          : value,
+      [name]: type === "checkbox" ? checked : value,
     }));
+  };
+
+  // RESET FORM
+  const resetFoodForm = () => {
+    setFoodForm({ ...initialFoodForm });
+    setImagePreview("");
+    setEditingFoodId(null);
   };
 
   // ADD OR UPDATE FOOD
   const handleFoodSubmit = async (e) => {
     e.preventDefault();
 
+    if (saving) return;
+
     try {
+      setSaving(true);
       setError("");
       setMessage("");
 
-      // Validate category
       if (!FOOD_CATEGORIES.includes(foodForm.category)) {
         setError("Please select a valid food category.");
+        return;
+      }
+
+      if (!editingFoodId && !foodForm.image) {
+        setError("Please select a food image.");
         return;
       }
 
       const formData = new FormData();
 
       formData.append("name", foodForm.name.trim());
-      formData.append(
-        "description",
-        foodForm.description.trim()
-      );
-      formData.append("price", foodForm.price);
-      formData.append(
-        "category",
-        foodForm.category.trim()
-      );
+      formData.append("description", foodForm.description.trim());
+      formData.append("price", String(foodForm.price));
+      formData.append("category", foodForm.category);
       formData.append(
         "isAvailable",
         String(foodForm.isAvailable)
       );
 
-      if (foodForm.image) {
+      if (foodForm.image instanceof File) {
         formData.append("image", foodForm.image);
       }
 
+      // DEBUG INFORMATION
+      console.log("Selected image:", foodForm.image);
+      console.log("FormData image:", formData.get("image"));
+
+      let response;
+
       if (editingFoodId) {
-        await api.put(
+        response = await api.put(
           `/foods/${editingFoodId}`,
           formData
         );
 
         setMessage("Food updated successfully!");
       } else {
-        if (!foodForm.image) {
-          setError("Please select a food image.");
-          return;
-        }
-
-        await api.post("/foods", formData);
+        response = await api.post("/foods", formData);
 
         setMessage("Food added successfully!");
       }
 
-      setFoodForm({ ...initialFoodForm });
-      setEditingFoodId(null);
+      console.log("Food API response:", response.data);
+
+      resetFoodForm();
 
       await fetchData();
+
+      setMessage(
+        editingFoodId
+          ? "Food updated successfully!"
+          : "Food added successfully!"
+      );
+
     } catch (err) {
+      console.error("Food submission error:", err);
+      console.error("Server response:", err.response?.data);
+
       setError(
         err.response?.data?.message ||
-          "Failed to save food"
+        err.message ||
+        "Failed to save food"
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -175,7 +224,6 @@ const AdminDashboard = () => {
   const handleEditFood = (food) => {
     setEditingFoodId(food._id);
 
-    // Match category without case sensitivity
     const selectedCategory = FOOD_CATEGORIES.find(
       (category) =>
         category.toLowerCase() ===
@@ -191,6 +239,8 @@ const AdminDashboard = () => {
       isAvailable: food.isAvailable ?? true,
     });
 
+    setImagePreview(food.image || "");
+
     setError("");
     setMessage("");
 
@@ -202,8 +252,7 @@ const AdminDashboard = () => {
 
   // CANCEL EDIT
   const handleCancelEdit = () => {
-    setEditingFoodId(null);
-    setFoodForm({ ...initialFoodForm });
+    resetFoodForm();
     setError("");
     setMessage("");
   };
@@ -228,7 +277,7 @@ const AdminDashboard = () => {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Failed to delete food"
+        "Failed to delete food"
       );
     }
   };
@@ -241,10 +290,7 @@ const AdminDashboard = () => {
 
       await api.put(`/orders/${orderId}/status`, {
         status,
-        note: `Admin updated order status to ${status.replaceAll(
-          "_",
-          " "
-        )}`,
+        note: `Admin updated order status to ${status.replaceAll("_", " ")}`,
       });
 
       setMessage("Order status updated successfully!");
@@ -253,7 +299,7 @@ const AdminDashboard = () => {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Failed to update order status"
+        "Failed to update order status"
       );
     }
   };
@@ -270,7 +316,8 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
-      {/* DASHBOARD HEADER */}
+
+      {/* HEADER */}
       <header className="admin-header">
         <div>
           <span className="admin-eyebrow">
@@ -280,8 +327,7 @@ const AdminDashboard = () => {
           <h1>Admin Dashboard</h1>
 
           <p>
-            Welcome back,{" "}
-            <strong>{user?.name || "Admin"}</strong>!
+            Welcome back, <strong>{user?.name || "Admin"}</strong>!
             Here's what's happening with your restaurant.
           </p>
         </div>
@@ -299,11 +345,7 @@ const AdminDashboard = () => {
       {message && (
         <div className="admin-alert admin-success">
           <span>✓</span> {message}
-
-          <button
-            type="button"
-            onClick={() => setMessage("")}
-          >
+          <button type="button" onClick={() => setMessage("")}>
             ×
           </button>
         </div>
@@ -312,11 +354,7 @@ const AdminDashboard = () => {
       {error && (
         <div className="admin-alert admin-error">
           <span>!</span> {error}
-
-          <button
-            type="button"
-            onClick={() => setError("")}
-          >
+          <button type="button" onClick={() => setError("")}>
             ×
           </button>
         </div>
@@ -364,9 +402,7 @@ const AdminDashboard = () => {
           <div className="stat-icon">₹</div>
           <div>
             <p>Total Order Value</p>
-            <h2>
-              ₹{totalRevenue.toLocaleString("en-IN")}
-            </h2>
+            <h2>₹{totalRevenue.toLocaleString("en-IN")}</h2>
             <span>Value of all orders</span>
           </div>
         </div>
@@ -376,14 +412,10 @@ const AdminDashboard = () => {
       <section className="admin-section" id="add-food">
         <div className="section-heading">
           <div>
-            <span className="admin-eyebrow">
-              MENU MANAGEMENT
-            </span>
+            <span className="admin-eyebrow">MENU MANAGEMENT</span>
 
             <h2>
-              {editingFoodId
-                ? "Edit Food Item"
-                : "Add New Food"}
+              {editingFoodId ? "Edit Food Item" : "Add New Food"}
             </h2>
 
             <p>
@@ -393,9 +425,7 @@ const AdminDashboard = () => {
             </p>
           </div>
 
-          <span className="section-heading-icon">
-            🍕
-          </span>
+          <span className="section-heading-icon">🍕</span>
         </div>
 
         <form
@@ -403,11 +433,11 @@ const AdminDashboard = () => {
           onSubmit={handleFoodSubmit}
         >
           <div className="food-form-grid">
+
             {/* FOOD NAME */}
             <div className="form-group">
               <label htmlFor="food-name">
-                Food Name{" "}
-                <span className="required-star">*</span>
+                Food Name <span className="required-star">*</span>
               </label>
 
               <input
@@ -421,11 +451,10 @@ const AdminDashboard = () => {
               />
             </div>
 
-            {/* FOOD PRICE */}
+            {/* PRICE */}
             <div className="form-group">
               <label htmlFor="food-price">
-                Price (₹){" "}
-                <span className="required-star">*</span>
+                Price (₹) <span className="required-star">*</span>
               </label>
 
               <input
@@ -441,11 +470,10 @@ const AdminDashboard = () => {
               />
             </div>
 
-            {/* FOOD DESCRIPTION */}
+            {/* DESCRIPTION */}
             <div className="form-group form-full">
               <label htmlFor="food-description">
-                Food Description{" "}
-                <span className="required-star">*</span>
+                Food Description <span className="required-star">*</span>
               </label>
 
               <textarea
@@ -458,11 +486,10 @@ const AdminDashboard = () => {
               />
             </div>
 
-            {/* FOOD CATEGORY */}
+            {/* CATEGORY */}
             <div className="form-group">
               <label htmlFor="food-category">
-                Food Category{" "}
-                <span className="required-star">*</span>
+                Food Category <span className="required-star">*</span>
               </label>
 
               <select
@@ -477,10 +504,7 @@ const AdminDashboard = () => {
                 </option>
 
                 {FOOD_CATEGORIES.map((category) => (
-                  <option
-                    key={category}
-                    value={category}
-                  >
+                  <option key={category} value={category}>
                     {category}
                   </option>
                 ))}
@@ -491,26 +515,45 @@ const AdminDashboard = () => {
               </small>
             </div>
 
-            {/* FOOD IMAGE */}
+            {/* IMAGE */}
             <div className="form-group">
               <label htmlFor="food-image">
-                Food Image{" "}
-                <span className="required-star">*</span>
+                Food Image <span className="required-star">*</span>
               </label>
 
               <input
                 id="food-image"
                 type="file"
                 name="image"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                 onChange={handleFoodChange}
                 required={!editingFoodId}
               />
 
-              {editingFoodId && (
+              <small>
+                JPG, JPEG, PNG or WEBP. Maximum 10 MB.
+              </small>
+
+              {foodForm.image && (
                 <small>
-                  Leave empty to keep the existing image.
+                  Selected: {foodForm.image.name}
+                  {" "}({(foodForm.image.size / 1024).toFixed(1)} KB)
                 </small>
+              )}
+
+              {imagePreview && (
+                <div style={{ marginTop: "12px" }}>
+                  <img
+                    src={imagePreview}
+                    alt="Food preview"
+                    style={{
+                      width: "150px",
+                      height: "120px",
+                      objectFit: "cover",
+                      borderRadius: "10px",
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -527,13 +570,16 @@ const AdminDashboard = () => {
             <span>Food is currently available</span>
           </label>
 
-          {/* FORM BUTTONS */}
+          {/* BUTTONS */}
           <div className="food-form-actions">
             <button
               className="admin-primary-btn"
               type="submit"
+              disabled={saving}
             >
-              {editingFoodId
+              {saving
+                ? "Uploading..."
+                : editingFoodId
                 ? "✓ Update Food"
                 : "+ Add Food"}
             </button>
@@ -543,6 +589,7 @@ const AdminDashboard = () => {
                 className="admin-cancel-btn"
                 type="button"
                 onClick={handleCancelEdit}
+                disabled={saving}
               >
                 Cancel Edit
               </button>
@@ -551,21 +598,13 @@ const AdminDashboard = () => {
         </form>
       </section>
 
-      {/* FOOD MANAGEMENT */}
-      <section
-        className="admin-section"
-        id="manage-foods"
-      >
+      {/* MANAGE FOODS */}
+      <section className="admin-section" id="manage-foods">
         <div className="section-heading">
           <div>
-            <span className="admin-eyebrow">
-              YOUR RESTAURANT MENU
-            </span>
-
+            <span className="admin-eyebrow">YOUR RESTAURANT MENU</span>
             <h2>Manage Foods</h2>
-            <p>
-              View, edit, and manage your food items.
-            </p>
+            <p>View, edit, and manage your food items.</p>
           </div>
 
           <span className="section-count">
@@ -577,22 +616,14 @@ const AdminDashboard = () => {
           <div className="admin-empty">
             <span>🍽️</span>
             <h3>No food items yet</h3>
-            <p>
-              Add your first food item using the form above.
-            </p>
+            <p>Add your first food item using the form above.</p>
           </div>
         ) : (
           <div className="admin-food-list">
             {foods.map((food) => (
-              <div
-                className="admin-food-card"
-                key={food._id}
-              >
+              <div className="admin-food-card" key={food._id}>
                 <div className="food-card-image">
-                  <img
-                    src={food.image}
-                    alt={food.name}
-                  />
+                  <img src={food.image} alt={food.name} />
 
                   <span
                     className={
@@ -601,17 +632,12 @@ const AdminDashboard = () => {
                         : "food-status unavailable"
                     }
                   >
-                    {food.isAvailable
-                      ? "Available"
-                      : "Unavailable"}
+                    {food.isAvailable ? "Available" : "Unavailable"}
                   </span>
                 </div>
 
                 <div className="admin-food-info">
-                  <span className="food-category">
-                    {food.category}
-                  </span>
-
+                  <span className="food-category">{food.category}</span>
                   <h3>{food.name}</h3>
 
                   <p className="food-description">
@@ -625,9 +651,7 @@ const AdminDashboard = () => {
                       <button
                         className="food-edit-btn"
                         type="button"
-                        onClick={() =>
-                          handleEditFood(food)
-                        }
+                        onClick={() => handleEditFood(food)}
                       >
                         Edit
                       </button>
@@ -635,9 +659,7 @@ const AdminDashboard = () => {
                       <button
                         className="food-delete-btn"
                         type="button"
-                        onClick={() =>
-                          handleDeleteFood(food._id)
-                        }
+                        onClick={() => handleDeleteFood(food._id)}
                       >
                         Delete
                       </button>
@@ -650,22 +672,13 @@ const AdminDashboard = () => {
         )}
       </section>
 
-      {/* ORDER MANAGEMENT */}
-      <section
-        className="admin-section"
-        id="manage-orders"
-      >
+      {/* MANAGE ORDERS */}
+      <section className="admin-section" id="manage-orders">
         <div className="section-heading">
           <div>
-            <span className="admin-eyebrow">
-              ORDER MANAGEMENT
-            </span>
-
+            <span className="admin-eyebrow">ORDER MANAGEMENT</span>
             <h2>Manage Orders</h2>
-
-            <p>
-              Track customer orders and update their status.
-            </p>
+            <p>Track customer orders and update their status.</p>
           </div>
 
           <span className="section-count">
@@ -682,44 +695,29 @@ const AdminDashboard = () => {
         ) : (
           <div className="admin-orders-list">
             {orders.map((order) => (
-              <div
-                className="admin-order-card"
-                key={order._id}
-              >
+              <div className="admin-order-card" key={order._id}>
                 <div className="order-card-header">
                   <div>
-                    <span className="admin-eyebrow">
-                      ORDER ID
-                    </span>
-
-                    <h3>
-                      #{order._id.slice(-6).toUpperCase()}
-                    </h3>
+                    <span className="admin-eyebrow">ORDER ID</span>
+                    <h3>#{order._id.slice(-6).toUpperCase()}</h3>
                   </div>
 
                   <span
                     className={`order-status-badge status-${order.orderStatus}`}
                   >
-                    {order.orderStatus?.replaceAll(
-                      "_",
-                      " "
-                    )}
+                    {order.orderStatus?.replaceAll("_", " ")}
                   </span>
                 </div>
 
                 <div className="order-details-grid">
                   <div>
                     <span>Customer</span>
-                    <strong>
-                      {order.user?.name || "Unknown"}
-                    </strong>
+                    <strong>{order.user?.name || "Unknown"}</strong>
                   </div>
 
                   <div>
                     <span>Email</span>
-                    <strong>
-                      {order.user?.email || "N/A"}
-                    </strong>
+                    <strong>{order.user?.email || "N/A"}</strong>
                   </div>
 
                   <div>
@@ -731,9 +729,7 @@ const AdminDashboard = () => {
 
                   <div>
                     <span>Payment Method</span>
-                    <strong>
-                      {order.paymentMethod}
-                    </strong>
+                    <strong>{order.paymentMethod}</strong>
                   </div>
 
                   <div>
@@ -759,9 +755,7 @@ const AdminDashboard = () => {
                 </div>
 
                 <div className="order-status-control">
-                  <label
-                    htmlFor={`status-${order._id}`}
-                  >
+                  <label htmlFor={`status-${order._id}`}>
                     Update Order Status
                   </label>
 
@@ -769,34 +763,19 @@ const AdminDashboard = () => {
                     id={`status-${order._id}`}
                     value={order.orderStatus}
                     onChange={(e) =>
-                      handleStatusChange(
-                        order._id,
-                        e.target.value
-                      )
+                      handleStatusChange(order._id, e.target.value)
                     }
                     disabled={[
                       "delivered",
                       "cancelled",
                     ].includes(order.orderStatus)}
                   >
-                    <option value="placed">
-                      Placed
-                    </option>
-                    <option value="confirmed">
-                      Confirmed
-                    </option>
-                    <option value="preparing">
-                      Preparing
-                    </option>
-                    <option value="out_for_delivery">
-                      Out for Delivery
-                    </option>
-                    <option value="delivered">
-                      Delivered
-                    </option>
-                    <option value="cancelled">
-                      Cancelled
-                    </option>
+                    <option value="placed">Placed</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>
@@ -811,9 +790,7 @@ const AdminDashboard = () => {
           Made with ❤️ for <strong>Foodiee</strong> Admin
         </p>
 
-        <span>
-          Manage your restaurant. Serve happiness.
-        </span>
+        <span>Manage your restaurant. Serve happiness.</span>
       </footer>
     </div>
   );

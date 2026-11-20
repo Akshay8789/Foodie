@@ -1,3 +1,4 @@
+
 import express from "express";
 
 import {
@@ -18,22 +19,23 @@ import upload from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
-// Public
-router.get(
-  "/categories",
-  getCategories
-);
-
+// Public routes
+router.get("/categories", getCategories);
 router.get("/", getFoods);
-
 router.get("/:id", getFoodById);
 
-// Admin
+// Admin routes
 router.post(
   "/",
   protect,
   admin,
   upload.single("image"),
+  (req, res, next) => {
+    console.log("Food upload request received");
+    console.log("Uploaded file:", req.file);
+    console.log("Request body:", req.body);
+    next();
+  },
   createFood
 );
 
@@ -45,11 +47,6 @@ router.put(
   updateFood
 );
 
-router.delete(
-  "/:id",
-  protect,
-  admin,
-  deleteFood
-);
+router.delete("/:id", protect, admin, deleteFood);
 
 export default router;
