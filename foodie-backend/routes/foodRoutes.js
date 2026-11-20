@@ -25,26 +25,41 @@ router.get("/", getFoods);
 router.get("/:id", getFoodById);
 
 // Admin routes
+
 router.post(
   "/",
   protect,
   admin,
+  (req, res, next) => {
+    console.log("Food POST route reached");
+    console.log("Content-Type:", req.headers["content-type"]);
+    next();
+  },
   upload.single("image"),
   (req, res, next) => {
-    console.log("Food upload request received");
-    console.log("Uploaded file:", req.file);
-    console.log("Request body:", req.body);
+    console.log("Multer received file:", req.file);
+    console.log("Multer received body:", req.body);
     next();
   },
   createFood
 );
 
-router.put(
-  "/:id",
+
+// router.put(
+//   "/:id",
+//   protect,
+//   admin,
+//   upload.single("image"),
+//   updateFood
+// );
+
+
+router.post(
+  "/",
   protect,
   admin,
   upload.single("image"),
-  updateFood
+  createFood
 );
 
 router.delete("/:id", protect, admin, deleteFood);
